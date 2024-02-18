@@ -1,13 +1,56 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from API import databaseAPI
+
+class LoginPage(tk.Frame):
+    def __init__(self, master=None, login_callback=None):
+        super().__init__(master)
+        self.master = master
+        self.pack()
+
+        self.username_label = tk.Label(self, text="Username")
+        self.username_label.pack(side="top")
+
+        self.username_entry = tk.Entry(self)
+        self.username_entry.pack(side="top")
+
+        self.password_label = tk.Label(self, text="Password")
+        self.password_label.pack(side="top")
+
+        self.password_entry = tk.Entry(self, show="*")
+        self.password_entry.pack(side="top")
+
+        self.login_button = tk.Button(self)
+        self.login_button["text"] = "Login"
+        self.login_button["command"] = self.login
+        self.login_button.pack(side="top")
+
+        self.login_callback = login_callback
+
+    def login(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        if self.login_callback:
+            success, db = self.login_callback(username, password)
+            if success:
+                self.master.db = db
+                self.pack_forget()
+                app = Application(master=self.master)
+                app.pack()
+            else:
+                messagebox.showerror("Login failed", "Invalid username or password")
+
+def login(username, password):
+    db = databaseAPI(username, password)
+    success = db.check_credentials(username, password)
+    return success, db
 
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.master = master
         self.pack()
-        self.db = databaseAPI()
+        self.db = master.db
         self.create_widgets()
 
     def create_widgets(self):
@@ -41,15 +84,22 @@ class Application(tk.Frame):
 
     def update_row_count(self):
         row_count = self.db.get_rows("in450a")
-        self.row_count_label["text"] = f"Rows in in450a: {row_count}"
+        if row_count is None:
+            self.row_count_label["text"] = "Unable to view data"
+        else:
+            self.row_count_label["text"] = f"Rows in in450a: {row_count}"
 
     def update_names(self):
         names = self.db.get_names("in450b")
-        for i, (first_name, last_name) in enumerate(names):
-            self.tree.insert("", "end", values=(i+1, first_name, last_name))
+        if names is None:
+            messagebox.showerror("Error", "Unable to view data")
+        else:
+            for i, (first_name, last_name) in enumerate(names):
+                self.tree.insert("", "end", values=(i+1, first_name, last_name))
 
 root = tk.Tk()
-root.title("IN450")
-root.geometry("500x600")
-app = Application(master=root)
-app.mainloop()
+root.title("Login")
+root.geometry("800x800")
+login_page = LoginPage(master=root, login_callback=login)
+login_page.pack()
+root.mainloop()
